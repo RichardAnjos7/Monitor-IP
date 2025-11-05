@@ -736,6 +736,48 @@ class MonitorScreen(tk.Frame):
         """Retorna o intervalo configurado"""
         return self.interval_var.get()
     
+    def start_monitoring_multiple(self, selected_ips):
+        """Inicia monitoramento de múltiplos IPs
+        
+        Args:
+            selected_ips: Lista de tuplas (name, ip)
+        """
+        # Limita a 4 IPs
+        selected_ips = selected_ips[:4]
+        
+        # Para todos os monitores ativos
+        for panel in self.panels:
+            if panel.monitor:
+                panel.stop()
+        
+        # Remove painéis existentes se necessário
+        num_needed = len(selected_ips)
+        
+        # Se precisa de mais painéis, adiciona
+        while self.visible_panels < num_needed:
+            self.add_panel()
+        
+        # Se precisa de menos painéis, remove os extras
+        while self.visible_panels > num_needed:
+            if self.visible_panels > 0:
+                panel = self.panels[self.visible_panels - 1]
+                if panel.monitor:
+                    panel.stop()
+                panel.frame.grid_remove()
+                self.visible_panels -= 1
+        
+        # Configura cada painel com seu IP e inicia monitoramento
+        for i, (name, ip) in enumerate(selected_ips):
+            if i < len(self.panels):
+                panel = self.panels[i]
+                panel.ip_entry.config(state='normal')
+                panel.ip_entry.delete(0, tk.END)
+                panel.ip_entry.insert(0, ip)
+                panel.start_monitoring()
+        
+        self._update_panels_count()
+        self._update_panels_layout()
+    
     def _on_window_resize(self, event):
         """Atualiza layout quando a janela é redimensionada"""
         if event.widget == self.controller.root:
@@ -751,6 +793,9 @@ class CatalogScreen(tk.Frame):
         tk.Frame.__init__(self, parent, bg="#0a0a0a")
         self.controller = controller
         
+        # Dicionário para rastrear IPs selecionados: {name: (ip, checkbox_var)}
+        self.selected_ips = {}
+        
         # Botão voltar
         back_frame = tk.Frame(self, bg="#0a0a0a")
         back_frame.pack(fill='x', padx=10, pady=10)
@@ -762,6 +807,26 @@ class CatalogScreen(tk.Frame):
             width=15
         )
         btn_back.pack(side='left')
+        
+        # Botão monitorar selecionados
+        self.btn_monitor_selected = controller.create_add_button(
+            back_frame,
+            "MONITORAR SELECIONADOS",
+            self.monitor_selected_ips,
+            width=25
+        )
+        self.btn_monitor_selected.pack(side='left', padx=10)
+        self.btn_monitor_selected.config(state='disabled', fg="#00cc33")
+        
+        # Label para mostrar quantidade selecionada
+        self.selection_count_label = tk.Label(
+            back_frame,
+            text="[SELECIONADOS]: 0/4",
+            font=('Consolas', 9, 'bold'),
+            bg="#0a0a0a",
+            fg="#00cc33"
+        )
+        self.selection_count_label.pack(side='left', padx=15)
         
         # Título
         title_frame = tk.Frame(self, bg="#0a0a0a")
@@ -869,14 +934,27 @@ class CatalogScreen(tk.Frame):
         list_frame = tk.Frame(self, bg="#0a0a0a")
         list_frame.pack(fill='both', expand=True, padx=10, pady=10)
         
+        # Frame superior com label e instruções
+        list_header_frame = tk.Frame(list_frame, bg="#0a0a0a")
+        list_header_frame.pack(fill='x', pady=(0, 10))
+        
         list_label = tk.Label(
-            list_frame,
+            list_header_frame,
             text="[IPS CADASTRADOS]:",
             font=('Consolas', 10, 'bold'),
             bg="#0a0a0a",
             fg="#00ff41"
         )
-        list_label.pack(anchor='w', pady=(0, 10))
+        list_label.pack(side='left')
+        
+        instruction_label = tk.Label(
+            list_header_frame,
+            text="[Selecione até 4 IPs para monitorar simultaneamente]",
+            font=('Consolas', 8),
+            bg="#0a0a0a",
+            fg="#00cc33"
+        )
+        instruction_label.pack(side='left', padx=20)
         
         # Container para os cards de IPs (4 por linha)
         self.cards_container = tk.Frame(list_frame, bg="#0a0a0a")
@@ -908,6 +986,9 @@ class CatalogScreen(tk.Frame):
         for widget in self.cards_container.winfo_children():
             widget.destroy()
         
+        # Limpa seleções anteriores
+        self.selected_ips.clear()
+        
         # Obtém todos os IPs
         all_ips = self.controller.ip_catalog.get_all()
         
@@ -920,6 +1001,7 @@ class CatalogScreen(tk.Frame):
                 fg="#00cc33"
             )
             empty_label.pack(pady=50)
+            self._update_selection_ui()
             return
         
         # Organiza em colunas de 4
@@ -939,9 +1021,29 @@ class CatalogScreen(tk.Frame):
             )
             card.grid(row=row, column=col, padx=10, pady=10, sticky='nsew')
             
-            # Frame para o botão X no canto superior direito
+            # Frame para o botão X e checkbox no topo
             top_frame = tk.Frame(card, bg="#000000")
             top_frame.pack(fill='x', side='top')
+            
+            # Checkbox para seleção múltipla
+            checkbox_var = tk.BooleanVar(value=False)
+            checkbox = tk.Checkbutton(
+                top_frame,
+                variable=checkbox_var,
+                bg="#000000",
+                fg="#00ff41",
+                activebackground="#000000",
+                activeforeground="#00ff41",
+                selectcolor="#003300",
+                relief='flat',
+                bd=0,
+                cursor='hand2',
+                command=lambda n=name, ip_addr=ip, var=checkbox_var: self._on_checkbox_toggle(n, ip_addr, var)
+            )
+            checkbox.pack(side='left', padx=5, pady=5)
+            
+            # Armazena referência
+            self.selected_ips[name] = (ip, checkbox_var, False)  # (ip, var, is_selected)
             
             # Botão X para remover
             btn_remove_x = tk.Button(
@@ -990,6 +1092,8 @@ class CatalogScreen(tk.Frame):
         # Configura grid weights
         for i in range(items_per_row):
             self.cards_container.grid_columnconfigure(i, weight=1)
+        
+        self._update_selection_ui()
     
     def remove_ip(self, name):
         """Remove um IP do catálogo"""
@@ -999,6 +1103,61 @@ class CatalogScreen(tk.Frame):
                 messagebox.showinfo("Sucesso", f"'{name}' removido do catálogo.")
             else:
                 messagebox.showerror("Erro", f"Erro ao remover '{name}'.")
+    
+    def _on_checkbox_toggle(self, name, ip_addr, var):
+        """Callback quando checkbox é alterado"""
+        # Verifica se está tentando selecionar (marcar)
+        is_being_selected = var.get()
+        
+        if is_being_selected:
+            # Conta quantos já estão selecionados (antes de atualizar este)
+            selected_count = sum(1 for _, _, is_selected in self.selected_ips.values() if is_selected)
+            
+            # Se já tem 4 selecionados, cancela a seleção
+            if selected_count >= 4:
+                var.set(False)
+                messagebox.showinfo("Limite atingido", "Máximo de 4 IPs podem ser selecionados simultaneamente.")
+                return
+        
+        # Atualiza o estado de seleção
+        ip, checkbox_var, _ = self.selected_ips[name]
+        self.selected_ips[name] = (ip, checkbox_var, var.get())
+        
+        self._update_selection_ui()
+    
+    def _update_selection_ui(self):
+        """Atualiza a UI baseada na seleção"""
+        selected_count = sum(1 for _, _, is_selected in self.selected_ips.values() if is_selected)
+        self.selection_count_label.config(text=f"[SELECIONADOS]: {selected_count}/4")
+        
+        if selected_count > 0:
+            self.btn_monitor_selected.config(state='normal', fg="#00ff41")
+        else:
+            self.btn_monitor_selected.config(state='disabled', fg="#00cc33")
+    
+    def monitor_selected_ips(self):
+        """Inicia monitoramento dos IPs selecionados"""
+        # Obtém IPs selecionados
+        selected = [(name, ip) for name, (ip, _, is_selected) in self.selected_ips.items() if is_selected]
+        
+        if not selected:
+            messagebox.showwarning("Aviso", "Selecione pelo menos um IP para monitorar.")
+            return
+        
+        if len(selected) > 4:
+            messagebox.showwarning("Aviso", "Máximo de 4 IPs podem ser selecionados.")
+            selected = selected[:4]
+        
+        # Navega para tela de monitoramento
+        self.controller.show_frame('MonitorScreen')
+        
+        # Aguarda um pouco para a tela carregar
+        self.controller.root.after(100, lambda: self._start_multiple_ping(selected))
+    
+    def _start_multiple_ping(self, selected):
+        """Inicia monitoramento de múltiplos IPs"""
+        monitor_screen = self.controller.frames['MonitorScreen']
+        monitor_screen.start_monitoring_multiple(selected)
     
     def ping_ip(self, ip_addr):
         """Inicia monitoramento do IP selecionado"""
