@@ -20,11 +20,11 @@ def create_icon_if_needed():
     if not os.path.exists("icon.ico"):
         print("Gerando ícone...")
         try:
-            from PIL import Image, ImageDraw, ImageFont
+            from PIL import Image, ImageDraw, ImageFont  # type: ignore
         except ImportError:
             print("Instalando Pillow para gerar ícone...")
             subprocess.check_call([sys.executable, "-m", "pip", "install", "pillow"])
-            from PIL import Image, ImageDraw, ImageFont
+            from PIL import Image, ImageDraw, ImageFont  # type: ignore
         
         # Importa função de criação do ícone
         import create_icon
