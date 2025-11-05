@@ -12,6 +12,18 @@ if errorlevel 1 (
     echo.
 )
 
+REM Gera o icone se nao existir
+if not exist icon.ico (
+    echo Gerando icone...
+    python -c "import PIL" 2>nul
+    if errorlevel 1 (
+        echo Instalando Pillow para gerar icone...
+        python -m pip install pillow
+    )
+    python create_icon.py
+    echo.
+)
+
 echo Limpando builds anteriores...
 if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
@@ -22,10 +34,16 @@ echo Criando executavel...
 echo.
 
 REM Cria o executavel com PyInstaller usando python -m para garantir que funcione
+if exist icon.ico (
+    set ICON_OPTION=--icon=icon.ico
+) else (
+    set ICON_OPTION=--icon=NONE
+)
+
 python -m PyInstaller --onefile ^
     --windowed ^
     --name "MonitorIP" ^
-    --icon=NONE ^
+    %ICON_OPTION% ^
     --hidden-import=tkinter ^
     --hidden-import=tkinter.ttk ^
     --hidden-import=tkinter.messagebox ^

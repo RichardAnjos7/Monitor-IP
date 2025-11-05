@@ -15,6 +15,22 @@ def install_pyinstaller():
         subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
         print("PyInstaller instalado com sucesso!")
 
+def create_icon_if_needed():
+    """Cria o ícone se não existir"""
+    if not os.path.exists("icon.ico"):
+        print("Gerando ícone...")
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+        except ImportError:
+            print("Instalando Pillow para gerar ícone...")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "pillow"])
+            from PIL import Image, ImageDraw, ImageFont
+        
+        # Importa função de criação do ícone
+        import create_icon
+        create_icon.create_icon()
+        print()
+
 def build_executable():
     """Cria o executável usando PyInstaller"""
     print("=" * 50)
@@ -24,6 +40,9 @@ def build_executable():
     
     # Instala PyInstaller se necessário
     install_pyinstaller()
+    
+    # Gera ícone se necessário
+    create_icon_if_needed()
     
     # Limpa builds anteriores
     import shutil
@@ -41,6 +60,11 @@ def build_executable():
         except:
             pass
     
+    # Adiciona ícone se existir
+    icon_option = []
+    if os.path.exists("icon.ico"):
+        icon_option = ["--icon", "icon.ico"]
+    
     # Comando PyInstaller
     cmd = [
         "pyinstaller",
@@ -55,6 +79,10 @@ def build_executable():
         "--hidden-import", "ip_catalog",
         "main.py"
     ]
+    
+    # Adiciona opção de ícone se existir
+    if icon_option:
+        cmd = cmd[:2] + icon_option + cmd[2:]
     
     # Ajusta para Linux/Mac
     if sys.platform != "win32":
