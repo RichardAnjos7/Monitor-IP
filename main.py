@@ -8,7 +8,6 @@ from tkinter import ttk, messagebox
 from collections import deque
 from typing import Optional
 from ping_monitor import PingMonitor
-from csv_logger import CSVLogger
 from ip_catalog import IPCatalog
 
 
@@ -24,11 +23,10 @@ class PingPanel:
     ERROR_COLOR = "#ff0040"  # Vermelho neon
     WARNING_COLOR = "#ffaa00"  # Laranja neon
         
-    def __init__(self, parent_frame, app, panel_id: int, csv_logger: CSVLogger):
+    def __init__(self, parent_frame, app, panel_id: int):
         self.parent_frame = parent_frame
         self.app = app
         self.panel_id = panel_id
-        self.csv_logger = csv_logger
         self.monitor: Optional[PingMonitor] = None
         self.history = deque(maxlen=20)  # Histórico dos últimos 20 pings
         
@@ -252,15 +250,6 @@ class PingPanel:
         """Callback chamado após cada ping"""
         # Salva no histórico
         self.history.append(ping_result)
-        
-        # Salva no CSV
-        ip = ping_result.get('ip', self.ip_entry.get().strip())
-        self.csv_logger.log(
-            ping_result['timestamp'], 
-            ip, 
-            ping_result.get('rtt_ms'), 
-            ping_result['status']
-        )
         
         # Atualiza UI (precisa ser thread-safe)
         self.frame.after(0, self._update_ui, ping_result)
@@ -701,7 +690,7 @@ class MonitorScreen(tk.Frame):
             col = self.visible_panels % 2
             panel.frame.grid(row=row, column=col, sticky='nsew', padx=5, pady=5)
         else:
-            panel = PingPanel(self.panels_frame, self.controller, self.visible_panels, self.controller.csv_logger)
+            panel = PingPanel(self.panels_frame, self.controller, self.visible_panels)
             self.panels.append(panel)
             row = self.visible_panels // 2
             col = self.visible_panels % 2
@@ -1057,9 +1046,6 @@ class PingMonitorApp:
         x = (screen_width - initial_width) // 2
         y = (screen_height - initial_height) // 2
         self.root.geometry(f"{initial_width}x{initial_height}+{x}+{y}")
-        
-        # Logger CSV
-        self.csv_logger = CSVLogger()
         
         # Catálogo de IPs
         self.ip_catalog = IPCatalog()
