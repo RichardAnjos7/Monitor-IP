@@ -4,20 +4,64 @@ Salva e carrega IPs cadastrados com nomes
 """
 import json
 import os
+import sys
 from typing import Dict, List, Tuple, Optional
+
+
+def get_resource_path(relative_path):
+    """
+    Obtém o caminho absoluto do recurso, funciona para desenvolvimento e para PyInstaller
+    
+    Args:
+        relative_path: Caminho relativo do recurso
+        
+    Returns:
+        Caminho absoluto do recurso
+    """
+    try:
+        # PyInstaller cria um arquivo temporário e armazena o caminho em _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        # Se não estiver em PyInstaller, usa o diretório atual
+        base_path = os.path.abspath(".")
+    
+    return os.path.join(base_path, relative_path)
+
+
+def get_app_data_path(filename):
+    """
+    Obtém o caminho para salvar dados da aplicação (mesmo diretório do executável)
+    
+    Args:
+        filename: Nome do arquivo
+        
+    Returns:
+        Caminho absoluto onde salvar o arquivo
+    """
+    if getattr(sys, 'frozen', False):
+        # Se está rodando como executável (PyInstaller)
+        base_path = os.path.dirname(sys.executable)
+    else:
+        # Se está rodando como script
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    
+    return os.path.join(base_path, filename)
 
 
 class IPCatalog:
     """Gerenciador do catálogo de IPs cadastrados"""
     
-    def __init__(self, catalog_file: str = "ip_catalog.json"):
+    def __init__(self, catalog_file: str = None):
         """
         Inicializa o catálogo
         
         Args:
-            catalog_file: Caminho do arquivo JSON para salvar o catálogo
+            catalog_file: Caminho do arquivo JSON para salvar o catálogo (None = usa diretório do executável)
         """
-        self.catalog_file = catalog_file
+        if catalog_file is None:
+            self.catalog_file = get_app_data_path("ip_catalog.json")
+        else:
+            self.catalog_file = catalog_file
         self.catalog: Dict[str, str] = {}  # {nome: ip}
         self.load()
     

@@ -3,21 +3,45 @@ Logger CSV para salvar logs de ping
 """
 import csv
 import os
+import sys
 from datetime import datetime
 from typing import Optional
+
+
+def get_app_data_path(filename):
+    """
+    Obtém o caminho para salvar dados da aplicação (mesmo diretório do executável)
+    
+    Args:
+        filename: Nome do arquivo
+        
+    Returns:
+        Caminho absoluto onde salvar o arquivo
+    """
+    if getattr(sys, 'frozen', False):
+        # Se está rodando como executável (PyInstaller)
+        base_path = os.path.dirname(sys.executable)
+    else:
+        # Se está rodando como script
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    
+    return os.path.join(base_path, filename)
 
 
 class CSVLogger:
     """Classe para salvar logs de ping em arquivo CSV"""
     
-    def __init__(self, log_file: str = "ping_logs.csv"):
+    def __init__(self, log_file: str = None):
         """
         Inicializa o logger CSV
         
         Args:
-            log_file: Caminho do arquivo CSV
+            log_file: Caminho do arquivo CSV (None = usa diretório do executável)
         """
-        self.log_file = log_file
+        if log_file is None:
+            self.log_file = get_app_data_path("ping_logs.csv")
+        else:
+            self.log_file = log_file
         self._ensure_header()
     
     def _ensure_header(self):
