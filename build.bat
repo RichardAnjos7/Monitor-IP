@@ -8,7 +8,7 @@ REM Verifica se PyInstaller esta instalado
 python -c "import PyInstaller" 2>nul
 if errorlevel 1 (
     echo Instalando PyInstaller...
-    pip install pyinstaller
+    python -m pip install pyinstaller
     echo.
 )
 
@@ -21,8 +21,8 @@ echo.
 echo Criando executavel...
 echo.
 
-REM Cria o executavel com PyInstaller
-pyinstaller --onefile ^
+REM Cria o executavel com PyInstaller usando python -m para garantir que funcione
+python -m PyInstaller --onefile ^
     --windowed ^
     --name "MonitorIP" ^
     --icon=NONE ^
