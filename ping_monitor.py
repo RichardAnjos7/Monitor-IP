@@ -48,14 +48,20 @@ class PingMonitor:
                 # Linux/Mac: ping -c 1 -W timeout_sec (aumentado para 5 segundos)
                 cmd = ['ping', '-c', '1', '-W', '5', self.ip]
             
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                errors='ignore',
-                timeout=10  # Aumenta timeout para dar mais tempo
-            )
+            # Configuração para evitar que o CMD apareça no Windows
+            kwargs = {
+                'capture_output': True,
+                'text': True,
+                'encoding': 'utf-8',
+                'errors': 'ignore',
+                'timeout': 10  # Aumenta timeout para dar mais tempo
+            }
+            
+            # No Windows, usa CREATE_NO_WINDOW para evitar que o CMD apareça
+            if system == 'windows':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            
+            result = subprocess.run(cmd, **kwargs)
             
             # Parse do resultado
             output_text = (result.stdout or '') + (result.stderr or '')
